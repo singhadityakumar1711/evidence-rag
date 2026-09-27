@@ -5,7 +5,7 @@ with grounded citations.
 
 ## Current Status
 
-Day 1 — FastAPI skeleton
+Day 1 — FastAPI skeleton 
 
 ## Planned Architecture
 
