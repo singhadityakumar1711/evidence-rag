@@ -12,44 +12,79 @@ Completed so far:
 - Fixed-size and sentence-based chunking.
 - Configurable character overlap between chunks.
 - Chunk metadata for citations: source, title, document type, chunk index, and character offsets.
-- Local embedding helpers using SentenceTransformers.
+- Local embeddings using `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions).
+- PostgreSQL + pgvector persistence for documents, chunks, embeddings, and metadata.
+- A `POST /ingest` endpoint that chunks and embeds a document, then saves it to the database.
+- Docker Compose services for the API and PostgreSQL, with persistent database and model-cache volumes.
 - A small script that compares local embedding models on ten labelled retrieval questions.
 
 ## Current architecture
 
 ```text
-Document text
+POST /ingest
     ↓
-Ingestion and whitespace cleaning
+Validate and normalize document text
     ↓
-Chunks + source metadata
+Sentence-based chunks + source metadata
     ↓
-Local embedding model
+Local all-MiniLM-L6-v2 embeddings
     ↓
-Cosine-similarity retrieval experiment
+PostgreSQL + pgvector
+
+Separate experiment: compare embedding models with labelled retrieval questions
 ```
 
-PostgreSQL + pgvector, hybrid retrieval, reranking, answer generation, and citations in generated answers are planned next.
+Vector retrieval for user questions, hybrid search, reranking, answer generation, and citations in generated answers are planned next.
 
-## Local setup
+## Run the API and database with Docker
 
-Install the project dependencies:
+Start Docker Desktop, then run from the project directory:
+
+```powershell
+docker compose up --build
+```
+
+Compose starts the FastAPI app and PostgreSQL with pgvector. On the first database initialization, `db/init.sql` creates the extension and tables. The database files and downloaded Hugging Face model are kept in named Docker volumes, so they persist across container restarts. The model downloads on the first successful ingestion request.
+
+Check the API health:
+
+```text
+http://localhost:8000/health
+```
+
+Interactive API docs are available at:
+
+```text
+http://localhost:8000/docs
+```
+
+### Ingest a document
+
+Send a `POST` request to `http://localhost:8000/ingest` with a JSON body. For example:
+
+```json
+{
+  "document_id": "demo-001",
+  "source": "manual-test",
+  "title": "Local ingestion test",
+  "text": "EvidenceRAG ingests documents and divides their text into chunks. Each chunk is converted into an embedding for later retrieval.",
+  "document_type": "markdown"
+}
+```
+
+The response contains the document ID and number of chunks saved. Ingesting again with the same `document_id` replaces that document's previous chunks.
+
+> `init.sql` runs only when PostgreSQL initializes an empty data volume. Schema changes to an existing database need a migration; restarting Compose does not rerun the initialization script.
+
+## Local development and tests
+
+Install the Python dependencies:
 
 ```powershell
 uv sync
 ```
 
-Run the API:
-
-```powershell
-uv run uvicorn app.main:app --reload
-```
-
-Check the API:
-
-```text
-http://127.0.0.1:8000/health
-```
+The API's database configuration must point to a reachable PostgreSQL instance. When running the API outside Docker while the Compose database is running, use `localhost` as the database host instead of the Compose-only hostname `db`.
 
 ## Run tests
 
@@ -82,7 +117,14 @@ app/
   documents.py      # document schema and text ingestion
   chunking.py       # fixed-size and sentence chunking
   embeddings.py     # load a local model and create text vectors
-  main.py           # FastAPI application
+  database.py       # PostgreSQL connection setup
+  repository.py     # persist documents, chunks, embeddings, and metadata
+  schemas.py        # API request and response models
+  main.py           # FastAPI application and /health and /ingest endpoints
+db/
+  init.sql          # pgvector extension and database tables
+Dockerfile          # API container image
+compose.yaml        # API and PostgreSQL services
 scripts/
   compare_embeddings.py
 tests/
