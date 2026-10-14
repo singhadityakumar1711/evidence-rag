@@ -11,6 +11,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the application after installing its dependencies.
 COPY app ./app
+COPY scripts ./scripts
+COPY examples ./examples
 
 EXPOSE 8000
 
