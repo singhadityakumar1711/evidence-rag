@@ -1,0 +1,39 @@
+{
+  "documents": [
+    {
+      "document_id": "checkpoint-ingestion",
+      "source": "sample://checkpoint/ingestion",
+      "title": "Document ingestion",
+      "document_type": "markdown",
+      "text": "When a text document is ingested, repeated spaces, tabs, and line breaks are normalized to single spaces. The document ID, source, title, and document type are kept with the cleaned text. Sending the same document ID again replaces its previously stored chunks."
+    },
+    {
+      "document_id": "checkpoint-chunking",
+      "source": "sample://checkpoint/chunking",
+      "title": "Sentence-based chunking",
+      "document_type": "markdown",
+      "text": "Sentence-based chunking aims to keep a complete sentence in one chunk. A sentence longer than the target size remains a single chunk instead of being truncated. Overlap can repeat neighboring text to preserve context across chunks."
+    },
+    {
+      "document_id": "checkpoint-vectors",
+      "source": "sample://checkpoint/vectors",
+      "title": "Embeddings and vector storage",
+      "document_type": "markdown",
+      "text": "The embedding model turns each chunk into a 384-dimensional numeric vector. PostgreSQL stores these vectors using the pgvector extension. A query vector can be compared with stored chunk vectors using cosine distance."
+    }
+  ],
+  "questions": [
+    {
+      "query": "How does the system handle tabs and newlines in uploaded text?",
+      "expected_document_id": "checkpoint-ingestion"
+    },
+    {
+      "query": "Why avoid cutting a sentence in two?",
+      "expected_document_id": "checkpoint-chunking"
+    },
+    {
+      "query": "Where are the numerical representations of chunks stored?",
+      "expected_document_id": "checkpoint-vectors"
+    }
+  ]
+}
