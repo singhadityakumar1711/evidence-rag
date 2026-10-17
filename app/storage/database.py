@@ -1,4 +1,4 @@
-"""Open connections to the Postgres database used by the application."""
+"""Connect to PostgreSQL and register pgvector types."""
 
 import os
 

@@ -1,7 +1,7 @@
 import pytest
 
-from app.chunking import chunk_document
-from app.documents import ingest_text
+from app.processing.chunking import chunk_document
+from app.processing.documents import ingest_text
 
 
 def make_document(text: str):

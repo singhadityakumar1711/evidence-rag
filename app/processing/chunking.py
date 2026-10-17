@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import re
 from typing import Literal
 
-from app.documents import Document
+from app.processing.documents import Document
 
 
 ChunkingStrategy = Literal["fixed_size", "sentence"]
@@ -22,7 +22,6 @@ class Chunk:
 
 @dataclass(frozen=True)
 class _Sentence:
-    text: str
     start_char: int
     end_char: int
 
@@ -121,7 +120,7 @@ def _sentence_spans(text: str, chunk_size: int, overlap: int) -> list[tuple[int,
 
 def _sentences(text: str) -> list[_Sentence]:
     return [
-        _Sentence(match.group(), match.start(), match.end())
+        _Sentence(match.start(), match.end())
         for match in re.finditer(r"\S.*?[.!?](?=\s|$)|\S.*$", text)
     ]
 
