@@ -1,4 +1,4 @@
-"""Compare MiniLM and BGE-M3 on ten simple retrieval questions.
+"""Compare local embedding models on ten simple retrieval questions.
 
 Run with:
     uv run python -m scripts.compare_embeddings
@@ -6,16 +6,15 @@ Run with:
 
 from math import sqrt
 
-from app.chunking import chunk_document
-from app.documents import ingest_text
-from app.embeddings import embed_texts, load_model
+from app.processing.chunking import chunk_document
+from app.processing.documents import ingest_text
+from app.processing.embeddings import embed_texts, load_model
 
 
 MODEL_NAMES = [
     "sentence-transformers/all-MiniLM-L6-v2",
-    # "BAAI/bge-m3",
     "BAAI/bge-small-en-v1.5",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
 ]
 
 # Each document has one idea. The expected ID tells us which document answers

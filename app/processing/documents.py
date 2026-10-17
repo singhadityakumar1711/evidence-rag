@@ -1,3 +1,5 @@
+"""Normalize text and keep document source details."""
+
 from dataclasses import dataclass
 from typing import Literal
 
@@ -15,6 +17,7 @@ class Document:
 
 
 def clean_text(text: str) -> str:
+    """Collapse whitespace so chunk offsets refer to the saved text."""
     return " ".join(text.split())
 
 
@@ -26,7 +29,6 @@ def ingest_text(
     text: str,
     document_type: DocumentType,
 ) -> Document:
-
     cleaned_text = clean_text(text)
 
     return Document(

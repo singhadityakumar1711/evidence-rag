@@ -1,4 +1,4 @@
-from app.documents import Document, ingest_text
+from app.processing.documents import Document, ingest_text
 
 
 def test_ingest_text():

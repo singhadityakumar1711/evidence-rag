@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from app.documents import DocumentType
+from app.processing.documents import DocumentType
 
 
 class IngestRequest(BaseModel):

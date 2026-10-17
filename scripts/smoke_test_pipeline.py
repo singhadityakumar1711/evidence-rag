@@ -1,7 +1,7 @@
-"""Run the October 4 ingestion and first-retrieval checkpoint.
+"""Smoke-test ingestion, vector storage, and first retrieval results.
 
 Run inside the app container after starting Docker Compose:
-    uv run --no-sync python -m scripts.checkpoint_oct4
+    uv run --no-sync python -m scripts.smoke_test_pipeline
 """
 
 import json
@@ -10,9 +10,8 @@ from urllib.request import Request, urlopen
 
 from pgvector import Vector
 
-from app.database import get_connection
-from app.embeddings import embed_texts
-from app.main import get_embedding_model
+from app.processing.embeddings import embed_texts, get_embedding_model
+from app.storage.database import get_connection
 
 
 DATA_FILE = Path(__file__).resolve().parents[1] / "examples" / "checkpoint_set.json"
@@ -65,6 +64,7 @@ def main() -> None:
         correct = 0
         for question in questions:
             query_vector = Vector(embed_texts(model, [question["query"]])[0])
+            # Ignore unrelated documents already present in the database.
             chunk_id, document_id, text, source, distance = connection.execute(
                 """
                 SELECT chunk_id, document_id, text, metadata->>'source' AS source,

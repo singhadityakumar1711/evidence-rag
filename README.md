@@ -1,162 +1,64 @@
 # EvidenceRAG
 
-A learning-focused, production-style Retrieval-Augmented Generation (RAG) project for answering questions over public documents with source citations.
+A learning project for ingesting text documents, storing their embeddings in PostgreSQL/pgvector, and checking whether vector search retrieves relevant evidence. It does not generate answers yet.
 
-## Current progress
+## What works
 
-Completed so far:
+`POST /ingest` validates and normalizes text, splits it into **10-character fixed-size chunks**, embeds each chunk with local `all-MiniLM-L6-v2` (384 dimensions), and saves the document, chunks, source metadata, and vectors in PostgreSQL. Re-ingesting a document ID replaces its previous chunks in one transaction. The processing module also supports sentence-based chunking and configurable overlap, but the API does not currently use them.
 
-- FastAPI application with a `/health` endpoint.
-- Text ingestion with whitespace normalization.
-- Normalized document schema: ID, source, title, document type, and text.
-- Fixed-size and sentence-based chunking.
-- Configurable character overlap between chunks.
-- Chunk metadata for citations: source, title, document type, chunk index, and character offsets.
-- Local embeddings using `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions).
-- PostgreSQL + pgvector persistence for documents, chunks, embeddings, and metadata.
-- A `POST /ingest` endpoint that chunks and embeds a document, then saves it to the database.
-- Docker Compose services for the API and PostgreSQL, with persistent database and model-cache volumes.
-- A reproducible checkpoint with three sample documents and three questions to verify ingestion and first vector-search results.
-- A small script that compares local embedding models on ten labelled retrieval questions.
+`GET /health` checks that the API is running. The API accepts document text as JSON; it does not parse uploaded PDF or HTML files. A standalone smoke test embeds questions and performs exact cosine search over three sample documents. There is no public search or answer-generation endpoint yet.
 
-## Current architecture
+## Run locally
 
-```text
-POST /ingest
-    ↓
-Validate and normalize document text
-    ↓
-Sentence-based chunks + source metadata
-    ↓
-Local all-MiniLM-L6-v2 embeddings
-    ↓
-PostgreSQL + pgvector
-
-Checkpoint question → same embedding model → exact cosine search → closest chunk + source
-
-Separate experiment: compare embedding models with labelled retrieval questions
-```
-
-Reusable top-k retrieval for user questions, hybrid search, reranking, answer generation, and citations in generated answers are planned next.
-
-## Run the API and database with Docker
-
-Start Docker Desktop, then run from the project directory:
+Start Docker Desktop, then run:
 
 ```powershell
-docker compose up --build
+docker compose up --build -d
 ```
 
-Compose starts the FastAPI app and PostgreSQL with pgvector. On the first database initialization, `db/init.sql` creates the extension and tables. The database files and downloaded Hugging Face model are kept in named Docker volumes, so they persist across container restarts. The model downloads on the first successful ingestion request.
+Open `http://localhost:8000/docs` for the API interface, or `http://localhost:8000/health` for the health check. On first use, the embedding model downloads into a persistent Docker volume. `db/init.sql` creates the tables only when the database volume is empty; restarting Compose does not apply schema changes.
 
-Check the API health:
-
-```text
-http://localhost:8000/health
-```
-
-Interactive API docs are available at:
-
-```text
-http://localhost:8000/docs
-```
-
-### Ingest a document
-
-Send a `POST` request to `http://localhost:8000/ingest` with a JSON body. For example:
+Send JSON to `POST http://localhost:8000/ingest`:
 
 ```json
 {
   "document_id": "demo-001",
   "source": "manual-test",
   "title": "Local ingestion test",
-  "text": "EvidenceRAG ingests documents and divides their text into chunks. Each chunk is converted into an embedding for later retrieval.",
+  "text": "EvidenceRAG ingests documents and stores chunks for retrieval.",
   "document_type": "markdown"
 }
 ```
 
-The response contains the document ID and number of chunks saved. Ingesting again with the same `document_id` replaces that document's previous chunks.
+The response contains `document_id` and `chunks_saved`. Stop the services with `docker compose down` (named volumes remain intact).
 
-> `init.sql` runs only when PostgreSQL initializes an empty data volume. Schema changes to an existing database need a migration; restarting Compose does not rerun the initialization script.
+## Check the pipeline
 
-## October 4 checkpoint
-
-The original sample set in `examples/checkpoint_set.json` contains three documents and three questions with expected document IDs. With Docker Compose running, run this in another terminal:
+With Compose running, execute:
 
 ```powershell
-docker compose exec app uv run --no-sync python -m scripts.checkpoint_oct4
+docker compose exec app uv run --no-sync python -m scripts.smoke_test_pipeline
 ```
 
-The script sends each document through `POST /ingest`, then checks that all three documents have saved chunks with 384-dimensional embeddings. For each question, it embeds the query and prints the closest chunk, its source, cosine similarity, and whether the chunk belongs to the expected document. It searches only the checkpoint document IDs, so other documents already in your database do not affect these results. Re-running the script replaces the same three documents' chunks rather than adding duplicates.
+The script ingests `examples/checkpoint_set.json`, checks saved counts and vector dimensions, then prints the closest chunk and source for each of three questions. It uses pgvector's cosine-distance operator (`<=>`) without an approximate index; the displayed similarity is `1 - distance`, not a probability. Results are restricted to the three sample document IDs.
 
-**Indexing choice:** `db/init.sql` defines `embedding VECTOR(384)` but does not create an approximate vector index. The checkpoint uses exact nearest-neighbor search with pgvector's cosine-distance operator (`<=>`), which is simple and appropriate for this tiny set. The displayed cosine similarity is `1 - distance`; it is a ranking score, not a probability. An approximate index can be evaluated later with a larger document collection.
+An earlier run using **sentence-based** chunks saved 3 documents/9 chunks and found the expected document first for 3/3 questions. The API now uses fixed-size chunks, so those earlier counts and scores do **not** describe the current configuration; rerun the script for current results.
 
-In the recorded checkpoint run, ingestion saved **3 documents and 9 chunks**. All saved embeddings had **384 dimensions**. The first result for each question was:
+For the unit tests, run `uv sync` and then `uv run pytest -q`. `scripts/compare_embeddings.py` is an optional local model-comparison experiment (`uv run python -m scripts.compare_embeddings`); its first run may download model weights. If running the API outside Docker, point `DATABASE_URL` at `localhost` rather than the Compose hostname `db`.
 
-| Question | Closest chunk | Source | Cosine similarity |
-|---|---|---|---:|
-| How does the system handle tabs and newlines in uploaded text? | `checkpoint-ingestion:0000` | `sample://checkpoint/ingestion` | 0.560 |
-| Why avoid cutting a sentence in two? | `checkpoint-chunking:0000` | `sample://checkpoint/chunking` | 0.587 |
-| Where are the numerical representations of chunks stored? | `checkpoint-vectors:0000` | `sample://checkpoint/vectors` | 0.535 |
-
-The expected document appeared first for **3/3 questions** in this small sample. This is a document-level check, not a measure of answer quality: the third result points to the correct document, but its top chunk describes the vector rather than where it is stored.
-
-## Local development and tests
-
-Install the Python dependencies:
-
-```powershell
-uv sync
-```
-
-The API's database configuration must point to a reachable PostgreSQL instance. When running the API outside Docker while the Compose database is running, use `localhost` as the database host instead of the Compose-only hostname `db`.
-
-## Run tests
-
-```powershell
-uv run pytest -q
-```
-
-## Local embedding experiment
-
-The experiment uses a tiny public-safe document set and ten hand-labelled questions. For each model, it:
-
-1. converts document chunks into vectors;
-2. converts each question into a vector;
-3. calculates cosine similarity against every chunk;
-4. selects the highest-scoring chunk;
-5. reports Recall@1, the fraction of questions where the correct chunk ranked first.
-
-Configure the local models in `scripts/compare_embeddings.py`, then run:
-
-```powershell
-uv run python -m scripts.compare_embeddings
-```
-
-The first run downloads model weights into the local Hugging Face cache. Model weights are not committed to this repository.
-
-## Project structure
+## Project layout
 
 ```text
-app/
-  documents.py      # document schema and text ingestion
-  chunking.py       # fixed-size and sentence chunking
-  embeddings.py     # load a local model and create text vectors
-  database.py       # PostgreSQL connection setup
-  repository.py     # persist documents, chunks, embeddings, and metadata
-  schemas.py        # API request and response models
-  main.py           # FastAPI application and /health and /ingest endpoints
-db/
-  init.sql          # pgvector extension and database tables
-examples/
-  checkpoint_set.json  # three documents and labelled checkpoint questions
-Dockerfile          # API container image
-compose.yaml        # API and PostgreSQL services
-scripts/
-  checkpoint_oct4.py  # ingestion, dimension check, and first retrieval results
-  compare_embeddings.py
-tests/
-  test_documents.py
-  test_chunking.py
-  test_health.py
+app/main.py                 API routes and ingestion wiring
+app/api/schemas.py          request/response models
+app/processing/             document normalization, chunking, embeddings
+app/storage/                database connection and persistence
+db/init.sql                 pgvector tables
+examples/checkpoint_set.json
+scripts/smoke_test_pipeline.py
+scripts/compare_embeddings.py
+tests/                      document, chunking, and health tests
+Dockerfile, compose.yaml    local app and database services
 ```
+
+Next: reusable top-k search, retrieval evaluation, and answer generation with citations.

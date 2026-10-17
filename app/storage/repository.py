@@ -3,9 +3,9 @@
 from pgvector import Vector
 from psycopg.types.json import Jsonb
 
-from app.chunking import Chunk
-from app.database import get_connection
-from app.documents import Document
+from app.processing.chunking import Chunk
+from app.processing.documents import Document
+from app.storage.database import get_connection
 
 
 def save_document(

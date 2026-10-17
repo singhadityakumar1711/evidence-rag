@@ -1,22 +1,13 @@
-from functools import lru_cache
-
 from fastapi import FastAPI, HTTPException
 
-from app.chunking import chunk_document
-from app.documents import ingest_text
-from app.embeddings import embed_texts, load_model
-from app.repository import save_document
-from app.schemas import IngestRequest, IngestResponse
+from app.api.schemas import IngestRequest, IngestResponse
+from app.processing.chunking import chunk_document
+from app.processing.documents import ingest_text
+from app.processing.embeddings import EMBEDDING_MODEL_NAME, embed_texts, get_embedding_model
+from app.storage.repository import save_document
 
 
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-CHUNK_SIZE = 10
-
-
-@lru_cache(maxsize=1)
-def get_embedding_model():
-    """Load the local model on the first ingest and reuse it afterward."""
-    return load_model(EMBEDDING_MODEL_NAME)
+CHUNK_SIZE = 10  # Characters per fixed-size chunk, not a chunk count.
 
 app = FastAPI(
     title="EvidenceRAG",
@@ -47,7 +38,7 @@ def ingest(request: IngestRequest) -> IngestResponse:
 
     chunks = chunk_document(
         document,
-        strategy="sentence",
+        strategy="fixed_size",
         chunk_size=CHUNK_SIZE,
         overlap=0,
     )

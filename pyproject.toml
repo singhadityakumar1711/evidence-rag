@@ -1,7 +1,7 @@
 [project]
 name = "04-evidence-rag"
 version = "0.1.0"
-description = "Add your description here"
+description = "Learning project for document ingestion and pgvector-backed evidence retrieval"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

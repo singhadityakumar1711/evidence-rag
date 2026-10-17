@@ -1,4 +1,9 @@
-"""Small helpers for creating local text embeddings."""
+"""Load the local model and encode text as normalized vectors."""
+
+from functools import lru_cache
+
+
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 def load_model(model_name: str):
@@ -6,6 +11,12 @@ def load_model(model_name: str):
     from sentence_transformers import SentenceTransformer
 
     return SentenceTransformer(model_name)
+
+
+@lru_cache(maxsize=1)
+def get_embedding_model():
+    """Load the ingestion model once per process."""
+    return load_model(EMBEDDING_MODEL_NAME)
 
 
 def embed_texts(model, texts: list[str]) -> list[list[float]]:
