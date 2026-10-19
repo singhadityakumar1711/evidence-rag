@@ -6,7 +6,7 @@ A learning project for ingesting text documents, storing their embeddings in Pos
 
 `POST /ingest` validates and normalizes text, splits it into **10-character fixed-size chunks**, embeds each chunk with local `all-MiniLM-L6-v2` (384 dimensions), and saves the document, chunks, source metadata, and vectors in PostgreSQL. Re-ingesting a document ID replaces its previous chunks in one transaction. The processing module also supports sentence-based chunking and configurable overlap, but the API does not currently use them.
 
-`GET /health` checks that the API is running. The API accepts document text as JSON; it does not parse uploaded PDF or HTML files. A standalone smoke test embeds questions and performs exact cosine search over three sample documents. There is no public search or answer-generation endpoint yet.
+`POST /search` embeds a question with the same model and returns the closest chunks with cosine similarity scores and source metadata. `GET /health` checks that the API is running. The API accepts document text as JSON; it does not parse uploaded PDF or HTML files. Answer generation is planned for a later step.
 
 ## Run locally
 
@@ -32,6 +32,21 @@ Send JSON to `POST http://localhost:8000/ingest`:
 
 The response contains `document_id` and `chunks_saved`. Stop the services with `docker compose down` (named volumes remain intact).
 
+## Search stored documents
+
+After ingesting documents, send JSON to `POST http://localhost:8000/search`:
+
+```json
+{
+  "query": "Where are vectors stored?",
+  "top_k": 3
+}
+```
+
+`top_k` defaults to 5 and accepts values from 1 to 20. Blank questions and invalid limits return HTTP 422. The response contains `query` and a ranked `results` list; each result includes `chunk_id`, `document_id`, `text`, `score`, and `metadata` (source details and chunk offsets).
+
+Search uses exact cosine distance over chunks stored with the active embedding model. Scores are `1 - distance`, ordered highest first; they are not probabilities. An empty result list means no chunks matched the model. The current 10-character chunks can produce short, weak matches; retrieval quality still needs evaluation and chunk-size tuning.
+
 ## Check the pipeline
 
 With Compose running, execute:
@@ -44,21 +59,24 @@ The script ingests `examples/checkpoint_set.json`, checks saved counts and vecto
 
 An earlier run using **sentence-based** chunks saved 3 documents/9 chunks and found the expected document first for 3/3 questions. The API now uses fixed-size chunks, so those earlier counts and scores do **not** describe the current configuration; rerun the script for current results.
 
-For the unit tests, run `uv sync` and then `uv run pytest -q`. `scripts/compare_embeddings.py` is an optional local model-comparison experiment (`uv run python -m scripts.compare_embeddings`); its first run may download model weights. If running the API outside Docker, point `DATABASE_URL` at `localhost` rather than the Compose hostname `db`.
+For the unit tests, run `uv sync` and then `uv run python -m pytest -q`. Search tests use mocked dependencies; the live `/search` request has also been manually verified by the project author. This checks functionality rather than retrieval quality. `scripts/compare_embeddings.py` is an optional local model-comparison experiment (`uv run python -m scripts.compare_embeddings`); its first run may download model weights. If running the API outside Docker, point `DATABASE_URL` at `localhost` rather than the Compose hostname `db`.
 
 ## Project layout
 
 ```text
-app/main.py                 API routes and ingestion wiring
-app/api/schemas.py          request/response models
+app/main.py                 health, ingestion, and search routes
+app/api/schemas.py          ingestion request/response models
+app/api/search_schemas.py   search validation and result models
 app/processing/             document normalization, chunking, embeddings
+app/processing/retrieval.py question embedding and search orchestration
 app/storage/                database connection and persistence
+app/storage/vector_search.py  cosine search and result mapping
 db/init.sql                 pgvector tables
 examples/checkpoint_set.json
 scripts/smoke_test_pipeline.py
 scripts/compare_embeddings.py
-tests/                      document, chunking, and health tests
+tests/                      document, chunking, health, and search tests
 Dockerfile, compose.yaml    local app and database services
 ```
 
-Next: reusable top-k search, retrieval evaluation, and answer generation with citations.
+Next: keyword retrieval and a common result schema, followed by hybrid search, retrieval evaluation, and answer generation with citations.

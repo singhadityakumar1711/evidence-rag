@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
 
 from app.api.schemas import IngestRequest, IngestResponse
+from app.api.search_schemas import SearchRequest, SearchResponse
 from app.processing.chunking import chunk_document
 from app.processing.documents import ingest_text
 from app.processing.embeddings import EMBEDDING_MODEL_NAME, embed_texts, get_embedding_model
+from app.processing.retrieval import retrieve_chunks
 from app.storage.repository import save_document
 
 
@@ -55,3 +57,10 @@ def ingest(request: IngestRequest) -> IngestResponse:
         document_id=document.document_id,
         chunks_saved=chunks_saved,
     )
+
+
+@app.post("/search", response_model=SearchResponse)
+def search(request: SearchRequest) -> SearchResponse:
+    """Return the closest chunks with similarity scores and source metadata."""
+    results = retrieve_chunks(request.query, top_k=request.top_k)
+    return SearchResponse(query=request.query, results=results) # type: ignore
