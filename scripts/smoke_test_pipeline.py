@@ -49,7 +49,7 @@ def main() -> None:
             WHERE document_id = ANY(%s)
             """,
             (document_ids,),
-        ).fetchone()
+        ).fetchone() # type: ignore
 
         if document_count != len(documents) or chunk_count == 0:
             raise RuntimeError("The checkpoint documents were not all saved")
@@ -75,7 +75,7 @@ def main() -> None:
                 LIMIT 1
                 """,
                 (query_vector, document_ids),
-            ).fetchone()
+            ).fetchone() # type: ignore
 
             matched = document_id == question["expected_document_id"]
             correct += matched

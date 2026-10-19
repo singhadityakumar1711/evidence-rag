@@ -15,7 +15,7 @@ def load_model(model_name: str):
 
 @lru_cache(maxsize=1)
 def get_embedding_model():
-    """Load the ingestion model once per process."""
+    """Load the shared document and query model once per process."""
     return load_model(EMBEDDING_MODEL_NAME)
 
 
